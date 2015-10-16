@@ -22,9 +22,8 @@ type Request struct {
 	timestamp time.Time
 }
 
-func NewRequest(req http.Request) Request {
-	obj := Request{req: req, timestamp: time.Now()}
-	return obj
+func NewRequest(req http.Request) *Request {
+	return &Request{req: req, timestamp: time.Now()}
 }
 
 func (self Request) String() string {
@@ -35,7 +34,7 @@ func (self Request) proxyRequest(addr string, req http.Request) (*http.Response,
 	return http.Post(addr, "application/json", req.Body)
 }
 
-func (self *Request) requestBilling() ([]byte, error) {
+func (self *Request) requestTarget() ([]byte, error) {
 	resp, err := self.proxyRequest("http://httpbin.org/post", self.req)
 	if err != nil {
 		return []byte{}, err
@@ -56,7 +55,6 @@ func (self Request) parseJsonResponse(body []byte) (id int, err error) {
 	if err = json.Unmarshal(body, &f); err != nil {
 		return
 	}
-	fmt.Printf("JSON: %+v\n", f)
 	for k, v := range f.(map[string]interface{}) {
 		if k == "json" {
 			for k2, v2 := range v.(map[string]interface{}) {
@@ -76,7 +74,12 @@ func (self Request) parseJsonResponse(body []byte) (id int, err error) {
 	return 0, RequestAllocationError{"id wasn't catched - cant allocate request"}
 }
 
-/*func (self *Request) passResponse(req http.Request) {
-	addr := self.req.Header.Get("X-Callback-Path")
+/*
+func (self *Request) passResponse(req http.Request) error {
+
+	if addr=="" {
+		return errors.New("return path is not defined")
+	}
 	resp, _ := self.proxyRequest(addr, req)
-}*/
+}
+*/

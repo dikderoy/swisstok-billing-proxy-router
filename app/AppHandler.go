@@ -1,11 +1,8 @@
 package app
 
 import (
-	"log"
 	"net/http"
 )
-
-var Logger *log.Logger
 
 type AppHandler func(http.ResponseWriter, *http.Request) *AppError
 
