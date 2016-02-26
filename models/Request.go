@@ -3,9 +3,18 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/beego/x2j"
 	"io/ioutil"
 	"net/http"
 	"time"
+)
+
+const (
+	RequestTypeXML = "application/xml"
+	RequestTypeJSON = "application/json"
+
+	SenderAVK = "AVK"
+	SenderESB = "ESB"
 )
 
 type RequestAllocationError struct {
@@ -17,13 +26,24 @@ func (self RequestAllocationError) Error() string {
 }
 
 type Request struct {
-	id        int
-	req       http.Request
-	timestamp time.Time
+	id            int
+	req           http.Request
+	timestamp     time.Time
+	sender        string
+	cType         string
+	targetAddress *string
 }
 
-func NewRequest(req http.Request) *Request {
-	return &Request{req: req, timestamp: time.Now()}
+func NewRequest(req http.Request, sender, cType string) *Request {
+	return &Request{
+		req: req,
+		timestamp: time.Now(),
+		sender: sender,
+		cType: cType}
+}
+
+func (self Request) GetId() int {
+	return self.id
 }
 
 func (self Request) String() string {
@@ -31,11 +51,11 @@ func (self Request) String() string {
 }
 
 func (self Request) proxyRequest(addr string, req http.Request) (*http.Response, error) {
-	return http.Post(addr, "application/json", req.Body)
+	return http.Post(addr, self.cType, req.Body)
 }
 
-func (self *Request) requestTarget() ([]byte, error) {
-	resp, err := self.proxyRequest("http://httpbin.org/post", self.req)
+func (self *Request) RequestTarget(addr string) ([]byte, error) {
+	resp, err := self.proxyRequest(addr, self.req)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -51,7 +71,7 @@ func (self *Request) requestTarget() ([]byte, error) {
 }
 
 func (self Request) parseJsonResponse(body []byte) (id int, err error) {
-	var f  interface{}
+	var f interface{}
 	if err = json.Unmarshal(body, &f); err != nil {
 		return
 	}
@@ -72,6 +92,23 @@ func (self Request) parseJsonResponse(body []byte) (id int, err error) {
 		}
 	}
 	return 0, RequestAllocationError{"id wasn't catched - cant allocate request"}
+}
+
+func (self Request) parseXmlResponse(body []byte) (id int, err error) {
+	var f interface{}
+	xmlDoc, err := x2j.ByteDocToMap(body)
+	if err != nil {
+		return 0, RequestAllocationError{"xml failed to parse"}
+	}
+	f,err = x2j.MapValue(xmlDoc, "request.id", nil)
+	if err != nil {
+		return 0,RequestAllocationError{"xml failed to traverse id"}
+	}
+	fmt.Print(f)
+	id = 1
+	return
+
+	return 0, RequestAllocationError{"xml.id wasn't catched - cant match request"}
 }
 
 /*

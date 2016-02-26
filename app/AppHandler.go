@@ -4,18 +4,26 @@ import (
 	"net/http"
 )
 
-type AppHandler func(http.ResponseWriter, *http.Request) *AppError
+type AppHandler interface {
+	Handle(http.ResponseWriter, *http.Request) *AppError
+	SetApp(*App)
+}
 
-func (fn AppHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	defer func() {
-		if r := recover(); r != nil {
-			http.Error(res, "EFatal Recover", 500)
-		}
-	}()
-	if err := fn(res, req); err != nil {
-		http.Error(res, http.StatusText(err.code), err.code)
-		Logger.Printf("error[%d %s]:%s", err.code, err.message, err.error)
-	}
+type AppKernel struct {
+	AppHandler
+	app *App
+}
+
+func (self AppKernel) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+	return self.Handle(res, req)
+}
+
+func (self *AppKernel) SetApp(app *App) {
+	self.app = app
+}
+
+func (self *AppKernel) GetApp() *App {
+	return self.app
 }
 
 type AppError struct {
