@@ -43,6 +43,7 @@ atlassian-ide-plugin.xml
 com_crashlytics_export_strings.xml
 crashlytics.properties
 crashlytics-build.properties
+
 ### Go template
 # Compiled Object files, Static and Dynamic libs (Shared Objects)
 *.o
@@ -69,4 +70,5 @@ _testmain.go
 *.test
 *.prof
 
-# Created by .ignore support plugin (hsz.mobi)
+### project ignored
+/build
