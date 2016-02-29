@@ -3,6 +3,11 @@ package app
 import (
 	"log"
 	"../models"
+	"net/http"
+	"time"
+	"io"
+	"strings"
+	"strconv"
 )
 
 var (
@@ -12,13 +17,12 @@ var (
 type App struct {
 	chanel chan *models.Request
 	bucket *models.RequestBucket
-	config *AppConfig
+	config AppConfig
 }
 
-func (self *App) Init(config *AppConfig) {
+func (self *App) Init(config AppConfig) {
 	self.config = config
 	self.chanel = make(chan *models.Request, 1000)
-	self.bucket = models.GlobalBucket()
 }
 
 func (self *App) Start() {
@@ -26,16 +30,36 @@ func (self *App) Start() {
 }
 
 func (self *App) HandleIncomingRequests() {
-	for r := range App.chanel {
-		App.bucket.Add(r)
+	for r := range self.chanel {
+		if req, err := models.GlobalBucket().Find(r.GetId()); err == nil {
+			Logger.Printf("remove from bucket:", *req)
+			models.GlobalBucket().Remove(r.GetId())
+		}else {
+			models.GlobalBucket().Add(r)
+			Logger.Printf("add to bucket:", *r)
+			go self.SimulateResponse(r)
+		}
 	}
 }
 
-func (self *App) Config() *AppConfig {
+func (self *App) SimulateResponse(r *models.Request) {
+	time.Sleep(2)
+	var buf io.Reader = strings.NewReader(`<?xml version="1.0" encoding="utf-8"?>` +
+	`<request><req_type>wait_payment</req_type><param><cobill>17942</cobill><cobillgroup>9928</cobillgroup><corequest_list><corequest>` +
+	strconv.Itoa(r.GetId()) + `</corequest></corequest_list><currency>RUB</currency><sum>300</sum></param></request>`)
+	Logger.Printf("simulating xml response for", *r)
+	http.Post("http://localhost:8081/request/avk", models.RequestTypeXML, buf)
+}
+
+func (self *App) Config() AppConfig {
 	return self.config
 }
 
-func (app *App) NewAppKernel(h AppHandler) *AppKernel {
+func (self *App) GetChannel() *chan *models.Request {
+	return &self.chanel
+}
+
+func (app *App) NewAppKernel(h Handler) Handler {
 	h.SetApp(app)
-	return &AppKernel(h)
+	return h
 }

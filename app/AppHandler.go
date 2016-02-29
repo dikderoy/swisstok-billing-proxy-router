@@ -1,28 +1,38 @@
 package app
 
-import (
-	"net/http"
-)
+import "net/http"
 
-type AppHandler interface {
-	Handle(http.ResponseWriter, *http.Request) *AppError
+type Handler interface {
 	SetApp(*App)
+	GetApp() *App
+	ServeHTTP(res http.ResponseWriter, req *http.Request) *AppError
 }
 
-type AppKernel struct {
-	AppHandler
+type AppHandler struct {
+	handler Handler
+}
+
+func (self *AppHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+
+	if err := self.handler.ServeHTTP(res, req); err != nil {
+		http.Error(res, http.StatusText(err.code), err.code)
+		Logger.Printf("error[%d %s]:%s", err.code, err.message, err.error)
+	}
+}
+
+func NewAppHandler(h Handler) http.Handler {
+	return &AppHandler{handler:h}
+}
+
+type Kernel struct {
 	app *App
 }
 
-func (self AppKernel) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	return self.Handle(res, req)
-}
-
-func (self *AppKernel) SetApp(app *App) {
+func (self *Kernel) SetApp(app *App) {
 	self.app = app
 }
 
-func (self *AppKernel) GetApp() *App {
+func (self *Kernel) GetApp() *App {
 	return self.app
 }
 

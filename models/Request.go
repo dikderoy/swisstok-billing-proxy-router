@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+	"bytes"
+	"strconv"
 )
 
 const (
@@ -26,23 +28,24 @@ func (self RequestAllocationError) Error() string {
 }
 
 type Request struct {
-	id            int
-	req           http.Request
-	timestamp     time.Time
-	sender        string
-	cType         string
-	targetAddress *string
+	id              int
+	req             http.Request
+	timestamp       time.Time
+	sender          string
+	cType           string
+	callbackAddress string
 }
 
-func NewRequest(req http.Request, sender, cType string) *Request {
+func NewRequest(req http.Request, sender, cType string, cb string) *Request {
 	return &Request{
 		req: req,
 		timestamp: time.Now(),
 		sender: sender,
+		callbackAddress: cb,
 		cType: cType}
 }
 
-func (self Request) GetId() int {
+func (self *Request) GetId() int {
 	return self.id
 }
 
@@ -50,11 +53,22 @@ func (self Request) String() string {
 	return fmt.Sprintf("Req#%d#t.%s", self.id, self.timestamp)
 }
 
-func (self Request) proxyRequest(addr string, req http.Request) (*http.Response, error) {
+func (self *Request) proxyRequest(addr string, req http.Request) (*http.Response, error) {
+	fmt.Printf("proxy request{%d} to %s", self.id, addr)
 	return http.Post(addr, self.cType, req.Body)
 }
 
 func (self *Request) RequestTarget(addr string) ([]byte, error) {
+	switch self.sender {
+	case SenderESB:
+		return self.requestAVK(addr)
+	case SenderAVK:
+		return self.requestESB(addr)
+	}
+	return []byte{}, RequestAllocationError{"no proxy target"}
+}
+
+func (self *Request) requestAVK(addr string) ([]byte, error) {
 	resp, err := self.proxyRequest(addr, self.req)
 	if err != nil {
 		return []byte{}, err
@@ -70,7 +84,26 @@ func (self *Request) RequestTarget(addr string) ([]byte, error) {
 	return body, nil
 }
 
-func (self Request) parseJsonResponse(body []byte) (id int, err error) {
+func (self *Request) requestESB(addr string) ([]byte, error) {
+	fmt.Println("read xml response")
+	body, err := ioutil.ReadAll(self.req.Body)
+
+	bodyS := bytes.NewBuffer(body).String()
+	fmt.Println("rbody:", bodyS)
+
+	if err != nil {
+		return []byte{}, err
+	}
+	fmt.Println("parse xml response")
+	self.id, err = self.parseXmlResponse(body)
+	if err != nil {
+		return body, err
+	}
+	//here fake req to esb.
+	return body, nil
+}
+
+func (self *Request) parseJsonResponse(body []byte) (id int, err error) {
 	var f interface{}
 	if err = json.Unmarshal(body, &f); err != nil {
 		return
@@ -95,28 +128,26 @@ func (self Request) parseJsonResponse(body []byte) (id int, err error) {
 }
 
 func (self Request) parseXmlResponse(body []byte) (id int, err error) {
-	var f interface{}
-	xmlDoc, err := x2j.ByteDocToMap(body)
+	var f []interface{}
+	fmt.Printf("parsing xml response")
+
+	//xmlDoc, err := x2j.ByteDocToMap(body)
+	/*
 	if err != nil {
-		return 0, RequestAllocationError{"xml failed to parse"}
+		return 0, RequestAllocationError{"Ex:xml.parse:" + err.Error()}
 	}
-	f,err = x2j.MapValue(xmlDoc, "request.id", nil)
+	fmt.Printf("mapping xml response")
+	f, err = x2j.MapValue(xmlDoc, "request.id", nil)*/
+	breader := bytes.NewReader(body)
+	f, err = x2j.ReaderValuesFromTagPath(breader, "request.param.corequest_list.corequest")
 	if err != nil {
-		return 0,RequestAllocationError{"xml failed to traverse id"}
+		return 0, RequestAllocationError{"Ex:xml.traverseId:" + err.Error()}
 	}
-	fmt.Print(f)
-	id = 1
+	fmt.Println(f)
+
+	fid, err := strconv.ParseFloat(f[:1][0].(string), 64)
+	id = int(fid)
 	return
 
-	return 0, RequestAllocationError{"xml.id wasn't catched - cant match request"}
+	//return 0, RequestAllocationError{"xml.id wasn't catched - cant match request"}
 }
-
-/*
-func (self *Request) passResponse(req http.Request) error {
-
-	if addr=="" {
-		return errors.New("return path is not defined")
-	}
-	resp, _ := self.proxyRequest(addr, req)
-}
-*/
