@@ -15,7 +15,15 @@ type RequestHandler struct {
 	CallbackPath   string
 }
 
-func (self *RequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) *app.AppError {
+type EsbRequestHandler struct {
+	RequestHandler
+}
+
+type AvkRequestHandler struct {
+	RequestHandler
+}
+
+func (self *EsbRequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) *app.AppError {
 	var cbPath string
 	defer req.Body.Close()
 	addr := req.Header.Get("X-Callback-Path")
@@ -27,7 +35,20 @@ func (self *RequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Request
 		return app.NewAppError(400, "Callback path not given")
 	}
 	r := models.NewRequest(*req, self.SenderType, self.RequestType, cbPath)
-	response, err := r.RequestTarget(self.TargetEndpoint)
+	response, err := r.Process(self.TargetEndpoint)
+	if err != nil {
+		return app.NewAppError(500, "Failed to proxy request to target", err)
+	}
+	*self.GetApp().GetChannel() <- r
+	app.Logger.Printf("serving:", *r)
+	res.Header().Add("X-Request-Id", fmt.Sprint(r.GetId()))
+	res.Write(response)
+	return nil
+}
+
+func (self *AvkRequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) *app.AppError {
+	r := models.NewRequest(*req, self.SenderType, self.RequestType, self.CallbackPath)
+	response, err := r.Process(self.TargetEndpoint)
 	if err != nil {
 		return app.NewAppError(500, "Failed to proxy request to target", err)
 	}

@@ -9,6 +9,7 @@ import (
 	"time"
 	"bytes"
 	"strconv"
+	"go/types"
 )
 
 const (
@@ -53,49 +54,36 @@ func (self Request) String() string {
 	return fmt.Sprintf("Req#%d#t.%s", self.id, self.timestamp)
 }
 
-func (self *Request) proxyRequest(addr string, req http.Request) (*http.Response, error) {
+func (self *Request) ProxyRequest(addr string, req http.Request) (*http.Response, error) {
 	fmt.Printf("proxy request{%d} to %s", self.id, addr)
 	return http.Post(addr, self.cType, req.Body)
 }
 
-func (self *Request) RequestTarget(addr string) ([]byte, error) {
+func (self *Request) Process(addr string) ([]byte, error) {
 	switch self.sender {
 	case SenderESB:
-		return self.requestAVK(addr)
+		return self.RequestAVK(addr)
 	case SenderAVK:
-		return self.requestESB(addr)
+		return self.RequestESB(addr)
 	}
 	return []byte{}, RequestAllocationError{"no proxy target"}
 }
 
-func (self *Request) requestAVK(addr string) ([]byte, error) {
-	resp, err := self.proxyRequest(addr, self.req)
-	if err != nil {
-		return []byte{}, err
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return []byte{}, err
-	}
-	self.id, err = self.parseJsonResponse(body)
+func (self *Request) RequestAVK(addr string) ([]byte, error) {
+	resp, err := self.ProxyRequest(addr, self.req)
+	body := ReadContentFromRequest(resp)
+	self.id, err = self.ParseJsonResponse(body)
 	if err != nil {
 		return body, err
 	}
 	return body, nil
 }
 
-func (self *Request) requestESB(addr string) ([]byte, error) {
-	fmt.Println("read xml response")
-	body, err := ioutil.ReadAll(self.req.Body)
-
-	bodyS := bytes.NewBuffer(body).String()
-	fmt.Println("rbody:", bodyS)
-
-	if err != nil {
-		return []byte{}, err
-	}
+func (self *Request) RequestESB(addr string) ([]byte, error) {
+	var err error
 	fmt.Println("parse xml response")
-	self.id, err = self.parseXmlResponse(body)
+	body := ReadContentFromRequest(self.req)
+	self.id, err = self.ParseXmlResponse(body)
 	if err != nil {
 		return body, err
 	}
@@ -103,7 +91,7 @@ func (self *Request) requestESB(addr string) ([]byte, error) {
 	return body, nil
 }
 
-func (self *Request) parseJsonResponse(body []byte) (id int, err error) {
+func (self *Request) ParseJsonResponse(body []byte) (id int, err error) {
 	var f interface{}
 	if err = json.Unmarshal(body, &f); err != nil {
 		return
@@ -127,27 +115,37 @@ func (self *Request) parseJsonResponse(body []byte) (id int, err error) {
 	return 0, RequestAllocationError{"id wasn't catched - cant allocate request"}
 }
 
-func (self Request) parseXmlResponse(body []byte) (id int, err error) {
+func (self Request) ParseXmlResponse(body []byte) (id int, err error) {
 	var f []interface{}
-	fmt.Printf("parsing xml response")
-
-	//xmlDoc, err := x2j.ByteDocToMap(body)
-	/*
-	if err != nil {
-		return 0, RequestAllocationError{"Ex:xml.parse:" + err.Error()}
-	}
-	fmt.Printf("mapping xml response")
-	f, err = x2j.MapValue(xmlDoc, "request.id", nil)*/
-	breader := bytes.NewReader(body)
-	f, err = x2j.ReaderValuesFromTagPath(breader, "request.param.corequest_list.corequest")
+	bReader := bytes.NewReader(body)
+	f, err = x2j.ReaderValuesFromTagPath(bReader, "request.param.corequest_list.corequest")
 	if err != nil {
 		return 0, RequestAllocationError{"Ex:xml.traverseId:" + err.Error()}
 	}
 	fmt.Println(f)
-
 	fid, err := strconv.ParseFloat(f[:1][0].(string), 64)
 	id = int(fid)
 	return
+}
 
-	//return 0, RequestAllocationError{"xml.id wasn't catched - cant match request"}
+func ReadContentFromRequest(req interface{}) []byte {
+	var bodyBytes []byte
+
+	//todo: something wrong here
+
+	switch req.(type) {
+	case http.Request:
+		bodyBytes, _ = ioutil.ReadAll(req.(http.Request).Body)
+		var x http.Request = req.(http.Request)
+		x.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+		break
+	case http.Response:
+		bodyBytes, _ = ioutil.ReadAll(req.(http.Response).Body)
+		var y http.Response = req.(http.Response)
+		y.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+		break
+	default:
+		panic("given instance is nor http.Request, nor http.Response")
+	}
+	return bodyBytes
 }

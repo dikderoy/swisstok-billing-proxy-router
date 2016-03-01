@@ -15,26 +15,28 @@ func main() {
 	models.InitGlobalBucket(100)
 	a := app.App{}
 	a.Init(app.AppConfig{
-		AVKEndpoint:"http://httpbin.org/post",
-		ESBEndpoint:"http://httpbin.org/post",
+		AVKEndpoint:"http://httpbin.org/post?avk=1",
+		ESBEndpoint:"http://httpbin.org/post?esb=1",
 	})
 
 	app.Logger = log.New(os.Stdout, "\nhttp:", 0)
 
 	r := mux.NewRouter()
 	r.Handle("/request/esb", app.NewAppHandler(
-		a.NewAppKernel(&handlers.RequestHandler{
-			TargetEndpoint:a.Config().AVKEndpoint,
-			RequestType:models.RequestTypeJSON,
-			SenderType:models.SenderESB,
-		})))
+		a.NewAppKernel(&handlers.EsbRequestHandler{
+			handlers.RequestHandler{
+				TargetEndpoint:a.Config().AVKEndpoint,
+				RequestType:models.RequestTypeJSON,
+				SenderType:models.SenderESB,
+			}})))
 	r.Handle("/request/avk", app.NewAppHandler(
-		a.NewAppKernel(&handlers.RequestHandler{
-			TargetEndpoint:a.Config().ESBEndpoint,
-			RequestType:models.RequestTypeXML,
-			SenderType:models.SenderAVK,
-			CallbackPath:"http://localhost:8081",
-		})))
+		a.NewAppKernel(&handlers.AvkRequestHandler{
+			handlers.RequestHandler{
+				TargetEndpoint:a.Config().ESBEndpoint,
+				RequestType:models.RequestTypeXML,
+				SenderType:models.SenderAVK,
+				CallbackPath:"http://httpbin.org/xml",
+			}})))
 	r.Handle("/status", app.NewAppHandler(
 		a.NewAppKernel(&handlers.ListHandler{})))
 

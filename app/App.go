@@ -37,13 +37,12 @@ func (self *App) HandleIncomingRequests() {
 		}else {
 			models.GlobalBucket().Add(r)
 			Logger.Printf("add to bucket:", *r)
-			go self.SimulateResponse(r)
 		}
 	}
 }
 
 func (self *App) SimulateResponse(r *models.Request) {
-	time.Sleep(2)
+	time.Sleep(10*1000000)
 	var buf io.Reader = strings.NewReader(`<?xml version="1.0" encoding="utf-8"?>` +
 	`<request><req_type>wait_payment</req_type><param><cobill>17942</cobill><cobillgroup>9928</cobillgroup><corequest_list><corequest>` +
 	strconv.Itoa(r.GetId()) + `</corequest></corequest_list><currency>RUB</currency><sum>300</sum></param></request>`)
