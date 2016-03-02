@@ -9,7 +9,6 @@ import (
 	"time"
 	"bytes"
 	"strconv"
-	"go/types"
 )
 
 const (
@@ -34,7 +33,7 @@ type Request struct {
 	timestamp       time.Time
 	sender          string
 	cType           string
-	callbackAddress string
+	CallbackAddress string
 }
 
 func NewRequest(req http.Request, sender, cType string, cb string) *Request {
@@ -42,7 +41,7 @@ func NewRequest(req http.Request, sender, cType string, cb string) *Request {
 		req: req,
 		timestamp: time.Now(),
 		sender: sender,
-		callbackAddress: cb,
+		CallbackAddress: cb,
 		cType: cType}
 }
 
@@ -59,18 +58,9 @@ func (self *Request) ProxyRequest(addr string, req http.Request) (*http.Response
 	return http.Post(addr, self.cType, req.Body)
 }
 
-func (self *Request) Process(addr string) ([]byte, error) {
-	switch self.sender {
-	case SenderESB:
-		return self.RequestAVK(addr)
-	case SenderAVK:
-		return self.RequestESB(addr)
-	}
-	return []byte{}, RequestAllocationError{"no proxy target"}
-}
-
 func (self *Request) RequestAVK(addr string) ([]byte, error) {
 	resp, err := self.ProxyRequest(addr, self.req)
+	defer resp.Body.Close()
 	body := ReadContentFromRequest(resp)
 	self.id, err = self.ParseJsonResponse(body)
 	if err != nil {
@@ -79,15 +69,14 @@ func (self *Request) RequestAVK(addr string) ([]byte, error) {
 	return body, nil
 }
 
-func (self *Request) RequestESB(addr string) ([]byte, error) {
+func (self *Request) ParseIdFromXMLRes() ([]byte, error) {
 	var err error
 	fmt.Println("parse xml response")
-	body := ReadContentFromRequest(self.req)
+	body := ReadContentFromRequest(&self.req)
 	self.id, err = self.ParseXmlResponse(body)
 	if err != nil {
 		return body, err
 	}
-	//here fake req to esb.
 	return body, nil
 }
 
@@ -128,24 +117,18 @@ func (self Request) ParseXmlResponse(body []byte) (id int, err error) {
 	return
 }
 
-func ReadContentFromRequest(req interface{}) []byte {
-	var bodyBytes []byte
-
-	//todo: something wrong here
-
-	switch req.(type) {
-	case http.Request:
-		bodyBytes, _ = ioutil.ReadAll(req.(http.Request).Body)
-		var x http.Request = req.(http.Request)
-		x.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
-		break
-	case http.Response:
-		bodyBytes, _ = ioutil.ReadAll(req.(http.Response).Body)
-		var y http.Response = req.(http.Response)
+func ReadContentFromRequest(httpAbstract interface{}) (bodyBytes []byte) {
+	var err error = nil
+	if y, ok := httpAbstract.(*http.Response); ok == true {
+		bodyBytes, err = ioutil.ReadAll(y.Body)
 		y.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
-		break
-	default:
-		panic("given instance is nor http.Request, nor http.Response")
 	}
-	return bodyBytes
+	if x, ok := httpAbstract.(*http.Request); ok == true {
+		bodyBytes, err = ioutil.ReadAll(x.Body)
+		x.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+	}
+	if err != nil || len(bodyBytes) == 0 {
+		panic("failed to get body")
+	}
+	return
 }

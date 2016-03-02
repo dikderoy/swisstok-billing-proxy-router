@@ -1,6 +1,9 @@
 package app
 
-import "net/http"
+import (
+	"net/http"
+	"bytes"
+)
 
 type Handler interface {
 	SetApp(*App)
@@ -16,6 +19,7 @@ func (self *AppHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	if err := self.handler.ServeHTTP(res, req); err != nil {
 		http.Error(res, http.StatusText(err.code), err.code)
+		res.Write(bytes.NewBufferString(err.message).Bytes())
 		Logger.Printf("error[%d %s]:%s", err.code, err.message, err.error)
 	}
 }
