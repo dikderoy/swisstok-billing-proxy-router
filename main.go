@@ -31,7 +31,7 @@ func init() {
 
 	//config file setup
 	viper.SetConfigName("config")
-	viper.SetEnvPrefix("hap")
+	viper.SetEnvPrefix("har")
 	viper.AddConfigPath("/etc/hap/")
 	viper.AddConfigPath(".")
 	if err := viper.ReadInConfig(); err != nil {
