@@ -1,0 +1,19 @@
+#this is HTTP-Async-Proxy configuration file
+bind-to: ":8081"
+bucket-size: 100
+routes:
+  /request/esb1:
+    type: ESB
+    target-endpoint: "http://httpbin.org/post?avk=1"
+    default-callback-path: "http://httpbin.org/post?esb=1"
+    content-type: "application/json"
+  /request/esb2:
+    type: ESB
+    target-endpoint: "http://httpbin.org/post?avk=1"
+    default-callback-path: "http://httpbin.org/post?esb=2"
+    content-type: "application/json"
+  /request/avk:
+    type: AVK
+    target-endpoint: "http://httpbin.org/post?esb=1"
+    default-callback-path: "http://httpbin.org/post?avk=1"
+    content-type: "text/xml"

@@ -9,10 +9,10 @@ import (
 
 type RequestHandler struct {
 	app.Kernel
-	SenderType     string
-	TargetEndpoint string
-	RequestType    string
-	CallbackPath   string
+	SenderType     string `mapstructure:"type"`
+	TargetEndpoint string `mapstructure:"target-endpoint"`
+	RequestType    string `mapstructure:"content-type"`
+	CallbackPath   string `mapstructure:"default-callback-path"`
 }
 
 type EsbRequestHandler struct {
@@ -40,7 +40,7 @@ func (self *EsbRequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Requ
 		return app.NewAppError(500, "Failed to proxy request to target", err)
 	}
 	*self.GetApp().GetChannel() <- r
-	app.Logger.Printf("serving:", *r)
+	app.Logger.Printf("serving: %s \n", *r)
 	res.Header().Add("X-Request-Id", fmt.Sprint(r.GetId()))
 	res.Write(response)
 	return nil
@@ -50,7 +50,7 @@ func (self *AvkRequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Requ
 	var target string = self.TargetEndpoint
 	defer req.Body.Close()
 	r := models.NewRequest(*req, self.SenderType, self.RequestType, self.CallbackPath)
-	if _, err := r.ParseIdFromXMLRes(); err != nil {
+	if _, err := r.ParseIdFromXML(); err != nil {
 		return app.NewAppError(500, "Failed to parse request")
 	}
 	fmt.Println("id extracted")
@@ -65,11 +65,9 @@ func (self *AvkRequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Requ
 	if err != nil {
 		return app.NewAppError(500, "Failed to proxy request to target " + target, err)
 	}
-	fmt.Println("body extracting")
 	body := models.ReadContentFromRequest(response)
-	fmt.Println("body extracted")
 	*self.GetApp().GetChannel() <- r
-	app.Logger.Printf("serving:", *r)
+	app.Logger.Printf("serving: %s \n", *r)
 	res.WriteHeader(response.StatusCode)
 	res.Header().Add("X-Request-Id", fmt.Sprint(r.GetId()))
 	res.Write(body)

@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/beego/x2j"
 	"io/ioutil"
@@ -9,6 +8,7 @@ import (
 	"time"
 	"bytes"
 	"strconv"
+	"github.com/bitly/go-simplejson"
 )
 
 const (
@@ -69,7 +69,7 @@ func (self *Request) RequestAVK(addr string) ([]byte, error) {
 	return body, nil
 }
 
-func (self *Request) ParseIdFromXMLRes() ([]byte, error) {
+func (self *Request) ParseIdFromXML() ([]byte, error) {
 	var err error
 	fmt.Println("parse xml response")
 	body := ReadContentFromRequest(&self.req)
@@ -81,27 +81,11 @@ func (self *Request) ParseIdFromXMLRes() ([]byte, error) {
 }
 
 func (self *Request) ParseJsonResponse(body []byte) (id int, err error) {
-	var f interface{}
-	if err = json.Unmarshal(body, &f); err != nil {
+	ujs, err := simplejson.NewJson(body)
+	if err != nil {
 		return
 	}
-	for k, v := range f.(map[string]interface{}) {
-		if k == "json" {
-			for k2, v2 := range v.(map[string]interface{}) {
-				if k2 == "id" {
-					switch v2.(type) {
-					case float64:
-						id = int(v2.(float64))
-						return
-					default:
-						break
-					}
-				}
-			}
-			break
-		}
-	}
-	return 0, RequestAllocationError{"id wasn't catched - cant allocate request"}
+	return ujs.GetPath("json", "id").Int()
 }
 
 func (self Request) ParseXmlResponse(body []byte) (id int, err error) {

@@ -9,43 +9,82 @@ import (
 	"os"
 	"github.com/gorilla/mux"
 	gHandlers "github.com/gorilla/handlers"
+	"github.com/spf13/viper"
+	"fmt"
 )
 
+func mainFatalLogFromRecover(exitCode int) {
+	if err := recover(); err != nil {
+		fmt.Printf("main.fatal: %s \n", err)
+		os.Exit(exitCode)
+	}
+}
+
+func init() {
+	defer mainFatalLogFromRecover(1)
+	//defaults
+	viper.SetTypeByDefaultValue(true)
+	viper.SetDefault("ESBEndpoint", "http://httpbin.org/post?esb=1")
+	viper.SetDefault("AVKEndpoint", "http://httpbin.org/post?avk=1")
+	viper.SetDefault("bucket-size", 100)
+
+	//config file setup
+	viper.SetConfigName("config")
+	viper.SetEnvPrefix("hap")
+	viper.AddConfigPath("/etc/hap/")
+	viper.AddConfigPath(".")
+	if err := viper.ReadInConfig(); err != nil {
+		panic(fmt.Errorf("Fatal error config file: %s \n", err))
+	}
+
+}
+
 func main() {
-	models.InitGlobalBucket(100)
+	defer mainFatalLogFromRecover(2)
+
+	models.InitGlobalBucket(viper.GetInt("bucket-size"))
 	a := app.App{}
 	a.Init(app.AppConfig{
 		AVKEndpoint:"http://httpbin.org/post?avk=1",
 		ESBEndpoint:"http://httpbin.org/post?esb=1",
 	})
-
 	app.Logger = log.New(os.Stdout, "\nhttp:", 0)
 
 	r := mux.NewRouter()
-	r.Handle("/request/esb", app.NewAppHandler(
-		a.NewAppKernel(&handlers.EsbRequestHandler{
-			handlers.RequestHandler{
-				TargetEndpoint:a.Config().AVKEndpoint,
-				RequestType:models.RequestTypeJSON,
-				SenderType:models.SenderESB,
-			}})))
-	r.Handle("/request/avk", app.NewAppHandler(
-		a.NewAppKernel(&handlers.AvkRequestHandler{
-			handlers.RequestHandler{
-				TargetEndpoint:a.Config().ESBEndpoint,
-				RequestType:models.RequestTypeXML,
-				SenderType:models.SenderAVK,
-				CallbackPath:"http://httpbin.org/xml",
-			}})))
+	//get routes configuration
+	var endpointConfig map[string]handlers.RequestHandler
+
+	if err := viper.UnmarshalKey("routes", &endpointConfig); err != nil {
+		panic(fmt.Sprintf("cant unmarshal routes: %s", err))
+	}
+
+	fmt.Printf("%+v", endpointConfig)
+
+	var handler app.Handler
+	for route, conf := range endpointConfig {
+		switch conf.SenderType {
+		case models.SenderESB:
+			handler = &handlers.EsbRequestHandler{conf}
+			break;
+		case models.SenderAVK:
+			handler = &handlers.AvkRequestHandler{conf}
+			break;
+		default:
+			panic("unknown route type!")
+		}
+		fmt.Printf("applying new route: %v", handler)
+		r.Handle(route, app.NewAppHandler(a.NewAppKernel(handler)))
+	}
 	r.Handle("/status", app.NewAppHandler(
 		a.NewAppKernel(&handlers.ListHandler{})))
 
+	fmt.Println("starting application")
 	a.Start()
-
+	fmt.Printf("creating server at [%s]\n", viper.GetString("bind-to"))
 	server := http.Server{
-		Addr: ":8081",
-		Handler:gHandlers.RecoveryHandler(
-			gHandlers.RecoveryLogger(app.Logger))(r)}
-
+		Addr: viper.GetString("bind-to"),
+		Handler:gHandlers.CombinedLoggingHandler(os.Stdout,
+			gHandlers.RecoveryHandler(gHandlers.RecoveryLogger(app.Logger))(r))}
+	fmt.Printf("launching server at [%s]\n", viper.GetString("bind-to"))
 	server.ListenAndServe()
 }
