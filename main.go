@@ -11,6 +11,7 @@ import (
 	gHandlers "github.com/gorilla/handlers"
 	"github.com/spf13/viper"
 	"fmt"
+	"time"
 )
 
 func mainFatalLogFromRecover(exitCode int) {
@@ -42,7 +43,11 @@ func init() {
 func main() {
 	defer mainFatalLogFromRecover(2)
 
-	models.InitGlobalBucket(viper.GetInt("bucket-size"))
+	bucketTtl, err := time.ParseDuration(viper.GetString("bucket-ttl"))
+	if err != nil {
+		panic("failed to parse bucket-ttl, check config")
+	}
+	models.InitGlobalBucket(bucketTtl)
 	a := app.App{}
 	a.Init(app.AppConfig{
 		AVKEndpoint:"http://httpbin.org/post?avk=1",
@@ -55,7 +60,7 @@ func main() {
 	var endpointConfig map[string]handlers.RequestHandler
 
 	if err := viper.UnmarshalKey("routes", &endpointConfig); err != nil {
-		panic(fmt.Sprintf("cant unmarshal routes: %s", err))
+		panic(fmt.Sprintf("cant unmarshal routes: %s , check config", err))
 	}
 
 	fmt.Printf("%+v", endpointConfig)

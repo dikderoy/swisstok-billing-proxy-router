@@ -1,15 +1,21 @@
 package models
 
-import "errors"
+import (
+	"errors"
+	"github.com/ikoroteev/ttlcache"
+	"time"
+	"strconv"
+)
 
 var bucket *RequestBucket
 
 type RequestBucket struct {
-	bucket map[int]*Request
+	bucket *ttlcache.Cache
+	ttl    time.Duration
 }
 
-func InitGlobalBucket(queueSize int) *RequestBucket {
-	bucket = NewRequestBucket(queueSize)
+func InitGlobalBucket(ttl time.Duration) *RequestBucket {
+	bucket = NewRequestBucket(ttl)
 	return bucket
 }
 
@@ -17,25 +23,29 @@ func GlobalBucket() *RequestBucket {
 	return bucket
 }
 
-func (self *RequestBucket) GetInternalMap() *map[int]*Request {
-	return &self.bucket
+func (self *RequestBucket) Count() int {
+	return self.bucket.Count()
 }
 
-func NewRequestBucket(queueSize int) *RequestBucket {
-	return &RequestBucket{bucket:make(map[int]*Request, queueSize)}
+func NewRequestBucket(ttl time.Duration) *RequestBucket {
+	return &RequestBucket{bucket:ttlcache.NewCache(), ttl:ttl}
 }
 
 func (self *RequestBucket) Add(r *Request) {
-	self.bucket[r.id] = r
+	self.bucket.Set(convert(r.GetId()), r, self.ttl)
 }
 
 func (self *RequestBucket) Find(id int) (*Request, error) {
-	if r := self.bucket[id]; r != nil {
-		return r, nil
+	if r, found := self.bucket.Get(convert(id), true); found == true {
+		return r.(*Request), nil
 	}
 	return nil, errors.New("Request does not exists")
 }
 
 func (self *RequestBucket) Remove(id int) {
-	delete(self.bucket, id)
+	self.bucket.Delete(convert(id))
+}
+
+func convert(in int) string {
+	return strconv.Itoa(in)
 }

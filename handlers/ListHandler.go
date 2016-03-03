@@ -27,8 +27,9 @@ func (self *ListHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) *
 		return app.NewAppError(404, fmt.Sprintf("Record [%d] not found", id))
 	}
 
-	for _, v := range *models.GlobalBucket().GetInternalMap() {
+	/*for _, v := range *models.GlobalBucket().GetInternalMap() {
 		io.WriteString(res, fmt.Sprintf("\n%+v", *v))
-	}
+	}*/
+	fmt.Fprintf(res, "%d", models.GlobalBucket().Count())
 	return nil
 }

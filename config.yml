@@ -1,6 +1,6 @@
 #this is HTTP-Async-Proxy configuration file
 bind-to: ":8081"
-bucket-size: 100
+bucket-ttl: 3h
 routes:
   /request/esb1:
     type: ESB
