@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	RequestTypeXML = "application/xml"
-	RequestTypeJSON = "application/json"
+//	RequestTypeXML = "application/xml"
+//	RequestTypeJSON = "application/json"
 
 	SenderAVK = "AVK"
 	SenderESB = "ESB"
@@ -70,7 +70,7 @@ func (self *Request) RequestAVK(addr string) ([]byte, error) {
 	body := ReadContentFromRequest(resp)
 	self.id, err = self.ParseJsonResponse(body)
 	if err != nil {
-		return body, RequestAllocationError{code:1, info:"failed to extract id"}
+		return body, &RequestAllocationError{code:1, info:fmt.Sprintf("Ex:json.traverseId: %s", err)}
 	}
 	return body, nil
 }
@@ -102,11 +102,12 @@ func (self *Request) ParseJsonResponse(body []byte) (id int, err error) {
 func (self Request) ParseXmlResponse(body []byte) (id int, err error) {
 	var f []interface{}
 	bReader := bytes.NewReader(body)
-	f, err = x2j.ReaderValuesFromTagPath(bReader, "request.param.corequest_list.corequest")
-	if err != nil {
-		return 0, RequestAllocationError{code:1, info:"Ex:xml.traverseId:" + err.Error()}
+	f, err = x2j.ReaderValuesFromTagPath(bReader, "request.param.*.corequest")
+	if err != nil || len(f) == 0 {
+		fmt.Printf("len is 0")
+		return 0, &RequestAllocationError{code:1, info:fmt.Sprintf("Ex:xml.traverseId: %s", err)}
 	}
-	fmt.Println(f)
+	fmt.Println("no errors catched", err, len(f), f)
 	fid, err := strconv.ParseFloat(f[:1][0].(string), 64)
 	id = int(fid)
 	return

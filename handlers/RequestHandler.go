@@ -47,17 +47,20 @@ func (self *EsbRequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Requ
 }
 
 func (self *AvkRequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) *app.AppError {
+	app.Logger.Println("\n-----rh begin-----")
+	defer app.Logger.Println("\n-----rh end-----")
+	//default target
 	var target string = self.TargetEndpoint
 	defer req.Body.Close()
 	r := models.NewRequest(*req, self.SenderType, self.RequestType, self.CallbackPath)
-	if _, err := r.ParseIdFromXML(); err != nil {
-		return app.NewAppError(500, "Failed to parse request")
-	}
-	fmt.Println("id extracted")
-	fmt.Println("bucket query")
-	if mr, err := models.GlobalBucket().Find(r.GetId()); err == nil && mr.GetId() == r.GetId() {
-		target = mr.CallbackAddress
-		fmt.Println("bucket queried")
+	if _, err := r.ParseIdFromXML(); err == nil {
+		//if valid id - search db
+		app.Logger.Println("id extracted")
+		app.Logger.Println("bucket query")
+		if mr, err := models.GlobalBucket().Find(r.GetId()); err == nil && mr.GetId() == r.GetId() {
+			target = mr.CallbackAddress
+			app.Logger.Println("bucket queried")
+		}
 	}
 	//pass avk response to esb
 	response, err := r.ProxyRequest(target, *req)
@@ -66,7 +69,10 @@ func (self *AvkRequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Requ
 		return app.NewAppError(500, "Failed to proxy request to target " + target, err)
 	}
 	body := models.ReadContentFromRequest(response)
-	*self.GetApp().GetChannel() <- r
+	if r.GetId() > 0 {
+		//store only identifiable requests
+		*self.GetApp().GetChannel() <- r
+	}
 	app.Logger.Printf("serving: %s \n", *r)
 	res.WriteHeader(response.StatusCode)
 	res.Header().Add("X-Request-Id", fmt.Sprint(r.GetId()))
