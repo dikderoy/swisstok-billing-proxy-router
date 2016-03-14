@@ -49,10 +49,7 @@ func main() {
 	}
 	models.InitGlobalBucket(bucketTtl)
 	a := app.App{}
-	a.Init(app.AppConfig{
-		AVKEndpoint:"http://httpbin.org/post?avk=1",
-		ESBEndpoint:"http://httpbin.org/post?esb=1",
-	})
+	a.Init()
 	app.Logger = log.New(os.Stdout, "\nhttp:", 0)
 
 	r := mux.NewRouter()
@@ -62,8 +59,6 @@ func main() {
 	if err := viper.UnmarshalKey("routes", &endpointConfig); err != nil {
 		panic(fmt.Sprintf("cant unmarshal routes: %s , check config", err))
 	}
-
-	fmt.Printf("%+v", endpointConfig)
 
 	var handler app.Handler
 	for route, conf := range endpointConfig {
@@ -77,7 +72,7 @@ func main() {
 		default:
 			panic("unknown route type!")
 		}
-		fmt.Printf("applying new route: %v", handler)
+		fmt.Printf("applying new route: %v\n", handler)
 		r.Handle(route, app.NewAppHandler(a.NewAppKernel(handler)))
 	}
 	r.Handle("/status", app.NewAppHandler(
@@ -91,5 +86,8 @@ func main() {
 		Handler:gHandlers.CombinedLoggingHandler(os.Stdout,
 			gHandlers.RecoveryHandler(gHandlers.RecoveryLogger(app.Logger))(r))}
 	fmt.Printf("launching server at [%s]\n", viper.GetString("bind-to"))
-	server.ListenAndServe()
+	err = server.ListenAndServe()
+	if err != nil {
+		fmt.Printf("Server Error: %s", err)
+	}
 }

@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"strconv"
 	"github.com/bitly/go-simplejson"
+	"os"
 )
 
 const (
@@ -20,7 +21,12 @@ const (
 )
 
 type RequestAllocationError struct {
+	code int
 	info string
+}
+
+func (self RequestAllocationError) Code() int {
+	return self.code
 }
 
 func (self RequestAllocationError) Error() string {
@@ -64,7 +70,7 @@ func (self *Request) RequestAVK(addr string) ([]byte, error) {
 	body := ReadContentFromRequest(resp)
 	self.id, err = self.ParseJsonResponse(body)
 	if err != nil {
-		return body, err
+		return body, RequestAllocationError{code:1, info:"failed to extract id"}
 	}
 	return body, nil
 }
@@ -85,7 +91,12 @@ func (self *Request) ParseJsonResponse(body []byte) (id int, err error) {
 	if err != nil {
 		return
 	}
-	return ujs.GetPath("json", "id").Int()
+	//slice test prefix
+	//ujs = ujs.Get("json")
+	if id, err = ujs.GetPath("result", "data").GetIndex(0).Get("COREQUEST").Int(); err == nil {
+		return
+	}
+	return ujs.GetPath("result", "result").Int()
 }
 
 func (self Request) ParseXmlResponse(body []byte) (id int, err error) {
@@ -93,7 +104,7 @@ func (self Request) ParseXmlResponse(body []byte) (id int, err error) {
 	bReader := bytes.NewReader(body)
 	f, err = x2j.ReaderValuesFromTagPath(bReader, "request.param.corequest_list.corequest")
 	if err != nil {
-		return 0, RequestAllocationError{"Ex:xml.traverseId:" + err.Error()}
+		return 0, RequestAllocationError{code:1, info:"Ex:xml.traverseId:" + err.Error()}
 	}
 	fmt.Println(f)
 	fid, err := strconv.ParseFloat(f[:1][0].(string), 64)
@@ -114,5 +125,8 @@ func ReadContentFromRequest(httpAbstract interface{}) (bodyBytes []byte) {
 	if err != nil || len(bodyBytes) == 0 {
 		panic("failed to get body")
 	}
+	fmt.Println("--req_body begin--")
+	bytes.NewBuffer(bodyBytes).WriteTo(os.Stdout)
+	fmt.Println("--req_body end--")
 	return
 }
