@@ -41,6 +41,9 @@ func (self *EsbRequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Requ
 		return app.NewAppError(500, "Failed to proxy request to target", err)
 	}
 	body, err := r.ParseIdFromJSON(response)
+	if err != nil {
+		app.Logger.Printf("parsing error: %s", err)
+	}
 	if r.GetId() > 0 {
 		*self.GetApp().GetChannel() <- r
 	}
@@ -65,6 +68,8 @@ func (self *AvkRequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Requ
 			target = mr.CallbackAddress
 			app.Logger.Println("bucket queried")
 		}
+	} else {
+		app.Logger.Printf("parsing error: %s", err)
 	}
 	//pass avk response to esb
 	response, err := r.ProxyRequest(target, *req)

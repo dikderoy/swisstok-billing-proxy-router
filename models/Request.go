@@ -93,10 +93,22 @@ func (self *Request) ParseJsonResponse(body []byte) (id int, err error) {
 	}
 	//slice test prefix
 	//ujs = ujs.Get("json")
-	if id, err = ujs.GetPath("result", "data").GetIndex(0).Get("COREQUEST").Int(); err == nil {
-		return
+	//slice root
+	ujs = ujs.Get("result")
+	fmt.Println(*ujs)
+	var idNode *simplejson.Json
+	idNode, ok := ujs.Get("data").GetIndex(0).CheckGet("COREQUEST");
+	if !ok {
+		if idNode, ok = ujs.CheckGet("result"); !ok {
+			return 0, &RequestAllocationError{code:1, info:"failed parse request"}
+		}
 	}
-	return ujs.GetPath("result", "result").Int()
+	if sid, err := idNode.String(); err == nil {
+		if id_f64, err := strconv.ParseFloat(sid, 64); err == nil {
+			id = int(id_f64)
+		}
+	}
+	return
 }
 
 func (self Request) ParseXmlResponse(body []byte) (id int, err error) {
