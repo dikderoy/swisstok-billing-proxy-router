@@ -35,14 +35,18 @@ func (self *EsbRequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Requ
 		return app.NewAppError(400, "Callback path not given")
 	}
 	r := models.NewRequest(*req, self.SenderType, self.RequestType, cbPath)
-	response, err := r.RequestAVK(self.TargetEndpoint)
+	response, err := r.ProxyRequest(self.TargetEndpoint, *req)
+	defer response.Body.Close()
 	if err != nil {
 		return app.NewAppError(500, "Failed to proxy request to target", err)
 	}
-	*self.GetApp().GetChannel() <- r
+	body, err := r.ParseIdFromJSON(response)
+	if r.GetId() > 0 {
+		*self.GetApp().GetChannel() <- r
+	}
 	app.Logger.Printf("serving: %s \n", *r)
 	res.Header().Add("X-Request-Id", fmt.Sprint(r.GetId()))
-	res.Write(response)
+	res.Write(body)
 	return nil
 }
 

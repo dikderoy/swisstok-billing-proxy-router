@@ -59,15 +59,15 @@ func (self Request) String() string {
 	return fmt.Sprintf("Req#%d#t.%s", self.id, self.timestamp)
 }
 
-func (self *Request) ProxyRequest(addr string, req http.Request) (*http.Response, error) {
+func (self *Request) ProxyRequest(addr string, req http.Request) (response *http.Response, err error) {
 	fmt.Printf("proxy request{%d} to %s", self.id, addr)
-	return http.Post(addr, self.cType, req.Body)
+	response, err = http.Post(addr, self.cType, req.Body)
+	fmt.Printf("proxy request complited with status: %3d %s", response.StatusCode, response.Status)
+	return
 }
 
-func (self *Request) RequestAVK(addr string) ([]byte, error) {
-	resp, err := self.ProxyRequest(addr, self.req)
-	defer resp.Body.Close()
-	body := ReadContentFromRequest(resp)
+func (self *Request) ParseIdFromJSON(resp *http.Response) (body []byte, err error) {
+	body = ReadContentFromRequest(resp)
 	self.id, err = self.ParseJsonResponse(body)
 	if err != nil {
 		return body, &RequestAllocationError{code:1, info:fmt.Sprintf("Ex:json.traverseId: %s", err)}
@@ -126,8 +126,8 @@ func ReadContentFromRequest(httpAbstract interface{}) (bodyBytes []byte) {
 	if err != nil || len(bodyBytes) == 0 {
 		panic("failed to get body")
 	}
-	fmt.Println("--req_body begin--")
+	fmt.Println("\n--req_body begin--")
 	bytes.NewBuffer(bodyBytes).WriteTo(os.Stdout)
-	fmt.Println("--req_body end--")
+	fmt.Println("\n--req_body end--")
 	return
 }
