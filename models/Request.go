@@ -55,14 +55,18 @@ func (self *Request) GetId() int {
 	return self.id
 }
 
+func (self *Request) GetType() string {
+	return self.sender
+}
+
 func (self Request) String() string {
 	return fmt.Sprintf("Req#%d#t.%s", self.id, self.timestamp)
 }
 
 func (self *Request) ProxyRequest(addr string, req http.Request) (response *http.Response, err error) {
-	fmt.Printf("proxy request{%d} to %s", self.id, addr)
+	fmt.Printf("\nproxy request{%d} to %s\n", self.id, addr)
 	response, err = http.Post(addr, self.cType, req.Body)
-	fmt.Printf("proxy request complited with status: %3d %s", response.StatusCode, response.Status)
+	fmt.Printf("\nproxy request complited with status: %3d %s\n", response.StatusCode, response.Status)
 	return
 }
 
@@ -99,8 +103,10 @@ func (self *Request) ParseJsonResponse(body []byte) (id int, err error) {
 	var idNode *simplejson.Json
 	idNode, ok := ujs.Get("data").GetIndex(0).CheckGet("COREQUEST");
 	if !ok {
-		if idNode, ok = ujs.CheckGet("result"); !ok {
-			return 0, &RequestAllocationError{code:1, info:"failed parse request"}
+		if idNode, ok = ujs.Get("values").CheckGet("v_corequest"); !ok {
+			if idNode, ok = ujs.CheckGet("result"); !ok {
+				return 0, &RequestAllocationError{code:1, info:"failed parse request"}
+			}
 		}
 	}
 	if sid, err := idNode.String(); err == nil {
@@ -114,7 +120,7 @@ func (self *Request) ParseJsonResponse(body []byte) (id int, err error) {
 func (self Request) ParseXmlResponse(body []byte) (id int, err error) {
 	var f []interface{}
 	bReader := bytes.NewReader(body)
-	f, err = x2j.ReaderValuesFromTagPath(bReader, "request.param.*.corequest")
+	f, err = x2j.ReaderValuesForTag(bReader, "corequest")
 	if err != nil || len(f) == 0 {
 		fmt.Printf("len is 0")
 		return 0, &RequestAllocationError{code:1, info:fmt.Sprintf("Ex:xml.traverseId: %s", err)}
@@ -135,7 +141,7 @@ func ReadContentFromRequest(httpAbstract interface{}) (bodyBytes []byte) {
 		bodyBytes, err = ioutil.ReadAll(x.Body)
 		x.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 	}
-	if err != nil || len(bodyBytes) == 0 {
+	if err != nil {
 		panic("failed to get body")
 	}
 	fmt.Println("\n--req_body begin--")

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"../app"
 	"../models"
+	"bytes"
+	"io/ioutil"
 )
 
 type RequestHandler struct {
@@ -60,7 +62,9 @@ func (self *AvkRequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Requ
 	var target string = self.TargetEndpoint
 	defer req.Body.Close()
 	r := models.NewRequest(*req, self.SenderType, self.RequestType, self.CallbackPath)
-	if _, err := r.ParseIdFromXML(); err == nil {
+	if body, err := r.ParseIdFromXML(); err == nil {
+		req.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+
 		//if valid id - search db
 		app.Logger.Println("id extracted")
 		app.Logger.Println("bucket query")

@@ -24,12 +24,13 @@ func (self *App) Start() {
 
 func (self *App) HandleIncomingRequests() {
 	for r := range self.chanel {
-		if req, err := models.GlobalBucket().Find(r.GetId()); err == nil {
-			Logger.Printf("touch bucket:", *req)
+		if _, err := models.GlobalBucket().Find(r.GetId()); err == nil || r.GetType() == models.SenderAVK {
+			Logger.Printf("touch bucket: %s", *r)
 			//models.GlobalBucket().Remove(r.GetId())
+			continue
 		}
 		models.GlobalBucket().Add(r)
-		Logger.Printf("add to bucket:", *r)
+		Logger.Printf("add to bucket: %s", *r)
 	}
 }
 
