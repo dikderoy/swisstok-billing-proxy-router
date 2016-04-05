@@ -69,6 +69,11 @@ Should you decide to configure more than one routing cluster - make sure they ar
 
 ## Configuration
 
+Configuration lookup is powered using [GoLang Viper](https://github.com/spf13/viper) library
+and is configured to watch for config variables in:
+- `/etc/har/config.yml` (takes precedence if exists)
+- `./config.yml` (current workdir)
+
 Following is a sample config file contents, with commentary
 
 ```yaml

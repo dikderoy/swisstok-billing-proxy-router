@@ -27,11 +27,8 @@ func init() {
 	viper.SetTypeByDefaultValue(true)
 	viper.SetDefault("ESBEndpoint", "http://httpbin.org/post?esb=1")
 	viper.SetDefault("AVKEndpoint", "http://httpbin.org/post?avk=1")
-	viper.SetDefault("bucket-size", 100)
-
 	//config file setup
 	viper.SetConfigName("config")
-	viper.SetEnvPrefix("har")
 	viper.AddConfigPath("/etc/har/")
 	viper.AddConfigPath(".")
 	if err := viper.ReadInConfig(); err != nil {

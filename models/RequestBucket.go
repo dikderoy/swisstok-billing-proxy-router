@@ -37,7 +37,7 @@ func (self *RequestBucket) Add(r *Request) {
 
 func (self *RequestBucket) Find(id int) (*Request, error) {
 	if r, found := self.bucket.Get(convert(id), true); found == true {
-		return r.(*Request)
+		return r.(*Request), nil
 	}
 	return nil, errors.New("Request does not exists")
 }
