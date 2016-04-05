@@ -32,7 +32,7 @@ func init() {
 	//config file setup
 	viper.SetConfigName("config")
 	viper.SetEnvPrefix("har")
-	viper.AddConfigPath("/etc/hap/")
+	viper.AddConfigPath("/etc/har/")
 	viper.AddConfigPath(".")
 	if err := viper.ReadInConfig(); err != nil {
 		panic(fmt.Errorf("Fatal error config file: %s \n", err))
