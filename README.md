@@ -91,3 +91,17 @@ routes:  # route configuration - each instance connected should use separate rou
     default-callback-path: "http://192.168.253.41/GATE_JSON/index.php" # async requests from ESB will be directed here (AVK node 1 real endpoint)
     content-type: "application/xml"
 ```
+
+## Logging
+
+All logs are going to STDOUT
+
+## Launch
+
+Currently no so called "Classic" UNIX daemon features is implemented.
+
+Launch, terminal unbinding and log targeting is done using following command:
+
+	./HAR-v0.3.0 >> har.log 2>&1 &
+	
+No log rotation is implemented either.
