@@ -13,8 +13,8 @@ import (
 )
 
 const (
-//	RequestTypeXML = "application/xml"
-//	RequestTypeJSON = "application/json"
+	//	RequestTypeXML = "application/xml"
+	//	RequestTypeJSON = "application/json"
 
 	SenderAVK = "AVK"
 	SenderESB = "ESB"
@@ -44,11 +44,11 @@ type Request struct {
 
 func NewRequest(req http.Request, sender, cType string, cb string) *Request {
 	return &Request{
-		req: req,
-		timestamp: time.Now(),
-		sender: sender,
+		req:             req,
+		timestamp:       time.Now(),
+		sender:          sender,
 		CallbackAddress: cb,
-		cType: cType}
+		cType:           cType}
 }
 
 func (self *Request) GetId() int {
@@ -71,7 +71,9 @@ func (self *Request) ProxyRequest(addr string, req http.Request) (response *http
 }
 
 func (self *Request) ParseIdFromJSON(resp *http.Response) (body []byte, err error) {
-	body = ReadContentFromRequest(resp)
+	var response AccessibleHttpResponse
+	response = AccessibleHttpResponse(*resp)
+	body = ReadContentFromRequest(&response)
 	self.id, err = self.ParseJsonResponse(body)
 	if err != nil {
 		return body, &RequestAllocationError{code:1, info:fmt.Sprintf("Ex:json.traverseId: %s", err)}
@@ -82,7 +84,9 @@ func (self *Request) ParseIdFromJSON(resp *http.Response) (body []byte, err erro
 func (self *Request) ParseIdFromXML() ([]byte, error) {
 	var err error
 	fmt.Println("parse xml response")
-	body := ReadContentFromRequest(&self.req)
+	var request AccessibleHttpRequest
+	request = AccessibleHttpRequest(self.req)
+	body := ReadContentFromRequest(&request)
 	self.id, err = self.ParseXmlResponse(body)
 	if err != nil {
 		return body, err
@@ -122,7 +126,7 @@ func (self Request) ParseXmlResponse(body []byte) (id int, err error) {
 	bReader := bytes.NewReader(body)
 	f, err = x2j.ReaderValuesForTag(bReader, "corequest")
 	if err != nil || len(f) == 0 {
-		fmt.Printf("len is 0")
+		fmt.Print("len is 0")
 		return 0, &RequestAllocationError{code:1, info:fmt.Sprintf("Ex:xml.traverseId: %s", err)}
 	}
 	fmt.Println("no errors catched", err, len(f), f)
@@ -131,16 +135,28 @@ func (self Request) ParseXmlResponse(body []byte) (id int, err error) {
 	return
 }
 
-func ReadContentFromRequest(httpAbstract interface{}) (bodyBytes []byte) {
-	var err error = nil
-	if y, ok := httpAbstract.(*http.Response); ok == true {
-		bodyBytes, err = ioutil.ReadAll(y.Body)
-		y.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
-	}
-	if x, ok := httpAbstract.(*http.Request); ok == true {
-		bodyBytes, err = ioutil.ReadAll(x.Body)
-		x.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
-	}
+type HttpMessageAbstract interface {
+	readBody() (body []byte, err error)
+}
+
+type AccessibleHttpResponse http.Response
+
+func (resp *AccessibleHttpResponse) readBody() (body []byte, err error) {
+	body, err = ioutil.ReadAll(resp.Body)
+	resp.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	return
+}
+
+type AccessibleHttpRequest http.Request
+
+func (req *AccessibleHttpRequest) readBody() (body []byte, err error) {
+	body, err = ioutil.ReadAll(req.Body)
+	req.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	return
+}
+
+func ReadContentFromRequest(httpAbstract HttpMessageAbstract) (bodyBytes []byte) {
+	bodyBytes, err := httpAbstract.readBody()
 	if err != nil {
 		panic("failed to get body")
 	}

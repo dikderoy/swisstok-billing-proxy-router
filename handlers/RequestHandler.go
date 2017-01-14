@@ -81,7 +81,8 @@ func (self *AvkRequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Requ
 	if err != nil {
 		return app.NewAppError(500, "Failed to proxy request to target " + target, err)
 	}
-	body := models.ReadContentFromRequest(response)
+	accessibleHttpResponse := models.AccessibleHttpResponse(*response)
+	body := models.ReadContentFromRequest(&accessibleHttpResponse)
 	if r.GetId() > 0 {
 		//store only identifiable requests
 		*self.GetApp().GetChannel() <- r
